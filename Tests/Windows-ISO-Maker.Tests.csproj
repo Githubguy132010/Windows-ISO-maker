@@ -1,0 +1,22 @@
+&lt;Project Sdk="Microsoft.NET.Sdk">
+
+  &lt;PropertyGroup>
+    &lt;TargetFramework>net7.0-windows10.0.19041.0&lt;/TargetFramework>
+    &lt;ImplicitUsings>enable&lt;/ImplicitUsings>
+    &lt;Nullable>enable&lt;/Nullable>
+    &lt;IsPackable>false&lt;/IsPackable>
+  &lt;/PropertyGroup>
+
+  &lt;ItemGroup>
+    &lt;PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.7.1" />
+    &lt;PackageReference Include="Moq" Version="4.20.69" />
+    &lt;PackageReference Include="MSTest.TestAdapter" Version="3.1.1" />
+    &lt;PackageReference Include="MSTest.TestFramework" Version="3.1.1" />
+    &lt;PackageReference Include="coverlet.collector" Version="6.0.0" />
+  &lt;/ItemGroup>
+
+  &lt;ItemGroup>
+    &lt;ProjectReference Include="..\Windows-ISO-Maker.csproj" />
+  &lt;/ItemGroup>
+
+&lt;/Project>

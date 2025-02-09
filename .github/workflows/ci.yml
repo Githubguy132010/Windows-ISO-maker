@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Test
+      run: dotnet test --no-build --verbosity normal --configuration Release
+      
+    - name: Test Tool Downloads
+      run: |
+        New-Item -ItemType Directory -Force -Path ".\Resources" | Out-Null
+        # Test PowerShell download
+        $pwshUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.6/PowerShell-7.3.6-win-x64.zip"
+        try {
+          Invoke-WebRequest -Uri $pwshUrl -OutFile ".\Resources\pwsh.zip"
+          Write-Host "PowerShell download successful"
+        } catch {
+          Write-Error "Failed to download PowerShell"
+          exit 1
+        }
+        
+        # Test ADK tools download
+        $adkUrl = "https://go.microsoft.com/fwlink/?linkid=2196127"
+        try {
+          Invoke-WebRequest -Uri $adkUrl -OutFile "adksetup.exe"
+          Write-Host "ADK download successful"
+        } catch {
+          Write-Error "Failed to download ADK"
+          exit 1
+        }
+      shell: powershell
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-iso-maker
+        path: |
+          **/bin/Release/net7.0-windows10.0.19041.0/win-x64/**
+          !**/bin/Release/net7.0-windows10.0.19041.0/win-x64/ref/**
+        
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-resources
+        path: Resources/

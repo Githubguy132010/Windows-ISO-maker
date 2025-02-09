@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Validate version
+        run: |
+          VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          CSPROJ_VERSION=$(grep -oP '(?<=<Version>).*(?=</Version>)' Windows-ISO-Maker.csproj)
+          if [ "$VERSION" != "$CSPROJ_VERSION" ]; then
+            echo "Tag version ($VERSION) does not match csproj version ($CSPROJ_VERSION)"
+            exit 1
+          fi
+
+  build:
+    needs: validate
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Download PowerShell
+      run: |
+        $pwshUrl = "https://github.com/PowerShell/PowerShell/releases/download/v7.3.6/PowerShell-7.3.6-win-x64.zip"
+        Invoke-WebRequest -Uri $pwshUrl -OutFile ".\Resources\pwsh.zip"
+      shell: powershell
+
+    - name: Download ADK Tools
+      run: |
+        $adkUrl = "https://go.microsoft.com/fwlink/?linkid=2196127"
+        Invoke-WebRequest -Uri $adkUrl -OutFile "adksetup.exe"
+        Start-Process -FilePath "adksetup.exe" -ArgumentList "/quiet /layout .\ADKLayout /features OptionId.DeploymentTools" -Wait
+        New-Item -ItemType Directory -Force -Path ".\Resources\oscdimg" | Out-Null
+        Copy-Item ".\ADKLayout\Windows Preinstallation Environment\amd64\oscdimg\*" -Destination ".\Resources\oscdimg"
+        Compress-Archive -Path ".\Resources\oscdimg\*" -DestinationPath ".\Resources\oscdimg.zip"
+      shell: powershell
+
+    - name: Publish
+      run: |
+        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+
+    - name: Package Release
+      run: |
+        New-Item -ItemType Directory -Force -Path release | Out-Null
+        Copy-Item "bin\Release\net7.0-windows10.0.19041.0\win-x64\publish\Windows-ISO-Maker.exe" -Destination "release"
+        Copy-Item "Resources\*.zip" -Destination "release"
+        Compress-Archive -Path "release\*" -DestinationPath "Windows-ISO-Maker-${{ github.ref_name }}.zip"
+      shell: powershell
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Windows-ISO-Maker-${{ github.ref_name }}.zip
+          release/Windows-ISO-Maker.exe
+        name: Windows ISO Maker ${{ github.ref_name }}
+        body: |
+          ## Windows ISO Maker ${{ github.ref_name }}
+          
+          ### Installation
+          1. Download and extract `Windows-ISO-Maker-${{ github.ref_name }}.zip`
+          2. Run `Windows-ISO-Maker.exe`
+          
+          ### Requirements
+          - Windows 10 or later
+          - .NET 7.0 Runtime (will be downloaded automatically if not present)
+          - Administrator privileges
+          
+          ### Changes
+          ${{ steps.changelog.outputs.changes }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
